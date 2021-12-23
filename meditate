@@ -79,6 +79,7 @@ EXHALEHOLDTIME=3
 
 if [[ -z "$PLAYER" ]];
 then
+  echo "No Player chosen. Exiting."
   exit -1;
 fi;
 
