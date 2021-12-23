@@ -15,7 +15,7 @@ function display_time() {
 usage="Usage: ./$(basename $0) [OPTIONS]
 
 Options:
- -p <player>      vlc, mpv
+ -p <player>      vlc, mpv, ffplay
  -h               this help"
 
 error_msg="Illegal usage. Try $(basename $0) -h for usage."
@@ -33,11 +33,15 @@ while getopts ":hp:" opt; do
         PLAYER="$OPTARG"
       else
         case "$OPTARG" in
+          # TODO: Check if selected players exist
           vlc)
             PLAYER="vlc --intf dummy --no-loop --play-and-exit --quiet --no-version"
             ;;
           mpv)
             PLAYER="mpv --no-terminal"
+            ;;
+          ffplay)
+            PLAYER="ffplay -nodisp -autoexit"
             ;;
           *)
           echo "$error_msg"
@@ -51,9 +55,6 @@ while getopts ":hp:" opt; do
       ;;
   esac
 done
-
-# Unnecessary shift. To be removed.
-shift $((OPTIND-1))
 
 FPATH=.
 INHALE="$FPATH"/Inhale.mp3
