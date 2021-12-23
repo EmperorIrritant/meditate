@@ -14,7 +14,7 @@ usage="Usage: ./$(basename $0) [OPTIONS]
 
 Options:
  -p <player>      vlc, mpv, ffplay
- -t <seconds>     set meditation timer (default: infinite)
+ -t <seconds>     set meditation timer (default: infinite) (NOT IMPLEMENTED YET)
  -h               this help"
 
 error_msg="Illegal usage. Try $(basename $0) -h for usage."
