@@ -28,8 +28,12 @@ PLAYER="mpv --no-terminal"
 
 count=0
 
-while getopts ":h:" opt ; do
-  case "$opt" in
+while getopts "h" opt; do
+  case "${opt}" in
+    h)
+      echo "$usage"
+      exit 0
+      ;;
     *)
       echo "$usage"
       exit 0
