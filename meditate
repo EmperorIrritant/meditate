@@ -14,20 +14,6 @@ function display_time() {
 
 usage="Usage: ./$(basename $0)"
 
-FPATH=.
-INHALE="$FPATH"/Inhale.mp3
-HOLD="$FPATH"/Hold.mp3
-EXHALE="$FPATH"/Exhale.mp3
-
-INHALETIME=6
-INHALEHOLDTIME=4
-EXHALETIME=7
-EXHALEHOLDTIME=3
-
-PLAYER="mpv --no-terminal"
-
-count=0
-
 while getopts "h" opt; do
   case "${opt}" in
     h)
@@ -41,6 +27,20 @@ while getopts "h" opt; do
   esac
 done
 shift $((OPTIND-1))
+
+FPATH=.
+INHALE="$FPATH"/Inhale.mp3
+HOLD="$FPATH"/Hold.mp3
+EXHALE="$FPATH"/Exhale.mp3
+
+INHALETIME=6
+INHALEHOLDTIME=4
+EXHALETIME=7
+EXHALEHOLDTIME=3
+
+PLAYER="mpv --no-terminal"
+
+count=0
 
 while sleep $EXHALEHOLDTIME;
 do
