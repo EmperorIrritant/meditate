@@ -1,5 +1,17 @@
 #!/bin/bash
 
+SECONDS=0
+
+trap display_time INT
+
+function display_time() {
+  diff=$SECONDS
+  tput cub 2 #To clear the "^C" characters printed on pressing Ctrl+C
+  echo "Full breath cycles: $count"
+  echo "Meditation Time: $(($diff / 3600)) hours, $((($diff / 60) % 60)) minutes and $(($diff % 60)) seconds"
+  exit
+}
+
 FPATH=.
 INHALE="$FPATH"/Inhale.mp3
 HOLD="$FPATH"/Hold.mp3
