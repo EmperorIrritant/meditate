@@ -12,20 +12,47 @@ function display_time() {
   exit
 }
 
-usage="Usage: ./$(basename $0)"
+usage="Usage: ./$(basename $0) [OPTIONS]
 
-while getopts ":h" opt; do
+Options:
+ -p <player>      vlc, mpv
+ -h               this help"
+
+error_msg="Illegal usage. Try $(basename $0) -h for usage."
+
+while getopts ":hp:" opt; do
   case "${opt}" in
     h)
       echo "$usage"
       exit 0
       ;;
+    p)
+      PLAYEROPTION=("$OPTARG")
+      if [[ "${#PLAYEROPTION[@]}" -gt 1 ]];
+      then
+        PLAYER="$OPTARG"
+      else
+        case "$OPTARG" in
+          vlc)
+            PLAYER="vlc --intf dummy --no-loop --play-and-exit --quiet --no-version"
+            ;;
+          mpv)
+            PLAYER="mpv --no-terminal"
+            ;;
+          *)
+          echo "$error_msg"
+          exit 0
+        esac
+      fi
+      ;;
     ?)
-      echo "Illegal usage. Try $(basename $0) -h for usage."
+      echo "$error_msg"
       exit 0
       ;;
   esac
 done
+
+# Unnecessary shift. To be removed.
 shift $((OPTIND-1))
 
 FPATH=.
@@ -38,18 +65,16 @@ INHALEHOLDTIME=4
 EXHALETIME=7
 EXHALEHOLDTIME=3
 
-PLAYER="mpv --no-terminal"
-
 count=0
 
 while sleep $EXHALEHOLDTIME;
 do
   count=$((count+1));
-  $PLAYER $INHALE;
+  $PLAYER $INHALE >&- 2>&-;
   sleep $INHALETIME;
-  $PLAYER $HOLD;
+  $PLAYER $HOLD >&- 2>&-;
   sleep $INHALEHOLDTIME;
-  $PLAYER $EXHALE;
+  $PLAYER $EXHALE >&- 2>&-;
   sleep $EXHALETIME;
-  $PLAYER $HOLD;
+  $PLAYER $HOLD >&- 2>&-;
 done
