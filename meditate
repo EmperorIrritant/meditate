@@ -14,14 +14,14 @@ function display_time() {
 
 usage="Usage: ./$(basename $0)"
 
-while getopts "h" opt; do
+while getopts ":h" opt; do
   case "${opt}" in
     h)
       echo "$usage"
       exit 0
       ;;
-    *)
-      echo "$usage"
+    ?)
+      echo "Illegal usage. Try $(basename $0) -h for usage."
       exit 0
       ;;
   esac
