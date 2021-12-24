@@ -14,8 +14,6 @@ function display_time() {
   exit 0
 }
 
-DEFAULTDB="meditate.db"
-
 usage="Usage: ./$(basename $0) [OPTIONS]
 
 Options:
@@ -25,17 +23,17 @@ Options:
  -s [file]              show session details in the database
  -h                     this help"
 
-illegal_option_error_msg="Illegal usage. Try $(basename $0) -h for usage."
-no_player_error_msg="No Player selected. "$illegal_option_error_msg""
+illegal_option_error_msg() { echo "Illegal usage. Try $(basename $0) -h for usage."; }
+no_player_error_msg() { echo "No Player selected. $(illegal_option_error_msg)"; }
 bold_text() { tput bold; echo -n "$1"; tput sgr0; }
 dbfile_not_found_error_msg() { echo "DB file $(bold_text $1) not found."; }
 dbfile_not_found_optiond_error_msg() { echo "$(dbfile_not_found_error_msg $1). Default file $(bold_text $DEFAULTDB) will be used."; }
 schema_diff_error_msg() { echo "The $1 file has a different schema. If it's the default db, then it will be renamed and a new file will be created."; }
 schema_cannot_check_msg() { echo "Not checking schema, as sqldiff is not available on Termux"; }
-db_update_success_msg="DB updated."
+db_update_success_msg() { echo "DB updated."; }
 
 setup_db() {
-  createdbstmt='CREATE TABLE IF NOT EXISTS "meditated" (
+  CREATETABLESTMT='CREATE TABLE IF NOT EXISTS "meditated" (
 	  "Session"	INTEGER PRIMARY KEY AUTOINCREMENT,
 	  "StartTime"	TEXT NOT NULL,
     "StartTimeSeconds" REAL NOT NULL,
@@ -44,40 +42,38 @@ setup_db() {
 	  "PatternName"	TEXT,
 	  "Pattern"	TEXT NOT NULL
     )';
-  sqlite3 "$1" "$createdbstmt";
+  sqlite3 "$1" "$CREATETABLESTMT";
 }
 
 update_db() {
   STARTTIMESECONDS="$1"
   SESSIONTIME="$2"
-  STARTTIME=$(date --date=@$STARTTIMESECONDS)
+  STARTTIME=$(date --utc --date=@$STARTTIMESECONDS)
   COUNT="$3"
   PATTERNNAME="$4"
   PATTERN="$5"
-  insertstmt='INSERT INTO "meditated" ("StartTime", "StartTimeSeconds", "Duration", "BreathCycles", "PatternName", "Pattern")
+  INSERTTBLSTMT='INSERT INTO "meditated" ("StartTime", "StartTimeSeconds", "Duration", "BreathCycles", "PatternName", "Pattern")
     VALUES ("'"$STARTTIME"'", '"$STARTTIMESECONDS"','"$SESSIONTIME"','"$COUNT"',"'"$PATTERNNAME"'","'"$PATTERN"'");'
-  #echo "Updating DB: $insertstmt";
-  response=$(sqlite3 "$DBFILE" "$insertstmt" 2>&1);
+  response=$(sqlite3 "$DBFILE" "$INSERTTBLSTMT" 2>&1);
   if [[ -z $response ]];
   then
-    echo "$db_update_success_msg";
+    db_update_success_msg;
   else
     echo "Error: $response";
   fi
 }
 
 check_db_schema() {
-#  echo "Checking DB Schema"
   if [[ -n "$TERMUX" ]];
   then
     schema_cannot_check_msg
     return
   fi
-  testdb="schematest.db"
-  setup_db "$testdb"
-  diff=$(sqldiff -schema "$1" "$testdb")
-  rm "$testdb"
-  if [[ -n "$diff" ]];
+  SCHEMATESTDB="schematest.db"
+  setup_db "$SCHEMATESTDB"
+  SQLDIFF=$(sqldiff -schema "$1" "$SCHEMATESTDB")
+  rm "$SCHEMATESTDB"
+  if [[ -n "$SQLDIFF" ]];
   then
     schema_diff_error_msg "$1"
     return -1
@@ -85,127 +81,125 @@ check_db_schema() {
 }
 
 display_db() {
-  querystmt="SELECT Session, StartTime, Duration, BreathCycles, PatternName, Pattern from meditated;"
+  QUERYSTMT="SELECT Session, StartTime, Duration, BreathCycles, PatternName, Pattern from meditated;"
   DBFILE="$1";
-  sqlite3 -header -column "$DBFILE" "$querystmt";
+  sqlite3 -header -column "$DBFILE" "$QUERYSTMT";
 }
 
-DBFILE="$DEFAULTDB"
-
-while getopts ":hp:t:d:s:" opt; do
-  case "${opt}" in
-    h)
-      echo "$usage"
-      exit 0
-      ;;
-    p)
-      PLAYEROPTION=("$OPTARG")
-      if [[ "${#PLAYEROPTION[@]}" -gt 1 ]];
-      then
-        PLAYER="$OPTARG"
-      else
-        case "$OPTARG" in
-          # TODO: Check if selected players exist
-          vlc)
-            PLAYER="vlc --intf dummy --no-loop --play-and-exit --quiet --no-version"
-            ;;
-          mpv)
-            PLAYER="mpv --no-terminal"
-            ;;
-          ffplay)
-            PLAYER="ffplay -nodisp -autoexit"
-            ;;
-          termux)
-            PLAYER="termux-media-player play"
-            TERMUX=1
-            ;;
-          *)
-          echo "$illegal_option_error_msg"
-          exit 0
-        esac
-      fi
-      ;;
-    t)
-      # Not implemented yet
-      TIMER="$OPTARG"
-      ;;
-    d)
-      DBFILE="${OPTARG}"
-      if [[ ! -f "$DBFILE" ]];
-      then
-        dbfile_not_found_optiond_error_msg "$DBFILE"
-        if [[ ! -f "$DEFAULTDB" ]];
+function parse_options() {
+  while getopts ":hp:t:d:s:" opt; do
+    case "${opt}" in
+      h)
+        echo "$usage"
+        exit 0
+        ;;
+      p)
+        PLAYEROPTION=("$OPTARG")
+        if [[ "${#PLAYEROPTION[@]}" -gt 1 ]];
         then
-          setup_db "$DEFAULTDB"
-          file="$DEFAULTDB"
+          PLAYER="$OPTARG"
         else
-          check_db_schema "$DEFAULTDB"
-          mv "$DEFAULTDB" "$DEFAULTDB.badschema"
-          setup_db "$DEFAULTDB"
+          case "$OPTARG" in
+            # TODO: Check if selected players exist
+            vlc)
+              PLAYER="vlc --intf dummy --no-loop --play-and-exit --quiet --no-version"
+              ;;
+            mpv)
+              PLAYER="mpv --no-terminal"
+              ;;
+            ffplay)
+              PLAYER="ffplay -nodisp -autoexit"
+              ;;
+            termux)
+              PLAYER="termux-media-player play"
+              TERMUX=1
+              ;;
+            *)
+              illegal_option_error_msg
+              exit 0
+          esac
         fi
-      else
-        check_db_schema "$DBFILE"
-        exit -1;
-      fi
-      ;;
-    s)
-      if [[ -f "$OPTARG" ]];
-      then
-        DBFILE="$OPTARG"
-        display_db "$DBFILE"
-      else
-        dbfile_not_found_error_msg "$OPTARG"
-      fi
-      exit 0;
-      ;;
-    :)
-      if [[ "$OPTARG" == "s" ]];
-      then
-        DBFILE="$DEFAULTDB"
-        display_db "$DBFILE"
-      fi
-      exit 0;
-      ;;
-    ?)
-      echo "$illegal_option_error_msg"
-      exit 0
-      ;;
-  esac
-done
+        ;;
+      t)
+        # Not implemented yet
+        TIMER="$OPTARG"
+        ;;
+      d)
+        DBFILE="${OPTARG}"
+        if [[ ! -f "$DBFILE" ]];
+        then
+          dbfile_not_found_optiond_error_msg "$DBFILE"
+          if [[ ! -f "$DEFAULTDB" ]];
+          then
+            setup_db "$DEFAULTDB"
+            file="$DEFAULTDB"
+          else
+            check_db_schema "$DEFAULTDB"
+            mv "$DEFAULTDB" "$DEFAULTDB.badschema"
+            setup_db "$DEFAULTDB"
+          fi
+        else
+          check_db_schema "$DBFILE"
+          exit -1;
+        fi
+        ;;
+      s)
+        if [[ -f "$OPTARG" ]];
+        then
+          DBFILE="$OPTARG"
+          display_db "$DBFILE"
+        else
+          dbfile_not_found_error_msg "$OPTARG"
+        fi
+        exit 0;
+        ;;
+      :)
+        if [[ "$OPTARG" == "s" ]];
+        then
+          DBFILE="$DEFAULTDB"
+          display_db "$DBFILE"
+        fi
+        exit 0;
+        ;;
+      ?)
+        illegal_option_error_msg
+        exit 0
+        ;;
+    esac
+  done
+}
 
-#if [[ -z "$TIMER" ]];
-#then
-#  if [ ! -t 0 ] && [ ! -t 1 ]; then
-#    exit -1;
-#  echo
-#  fi
-#fi
+function check_on_db() {
+  if [[ ! -f "$DBFILE" ]];
+  then
+    setup_db "$DEFAULTDB";
+  else
+    if [[ $(check_db_schema "$DBFILE") -ne 0 ]];
+    then
+      mv "$DBFILE" "$DBFILE.badschema.$(date +%Y-%m-%d_%H-%M-%S)"
+      setup_db "$DBFILE"
+    fi
+  fi
+}
 
-FPATH=.
-INHALE="$FPATH"/Inhale.mp3
-HOLD="$FPATH"/Hold.mp3
-EXHALE="$FPATH"/Exhale.mp3
-
-INHALETIME=6
-INHALEHOLDTIME=4
-EXHALETIME=7
-EXHALEHOLDTIME=3
-PATTERNNAME="custom"
-PATTERN="$INHALETIME $INHALEHOLDTIME $EXHALETIME $EXHALEHOLDTIME"
-
-if [[ -z "$PLAYER" ]];
-then
-  echo "$no_player_error_msg";
-  exit -1;
-fi;
-
-if [[ -z "$DBFILE" || ! -f "$DBFILE" ]];
-then
-  setup_db "$DEFAULTDB";
-  DBFILE="$DEFAULTDB";
-fi
-
-check_db_schema "$DBFILE" || mv "$DBFILE" "$DBFILE.badschema" && setup_db "$DBFILE"
+function options_or_no_options() {
+  DBFILE=$DEFAULTDB
+  if [[ "$#" -ge 0 ]];
+  then
+    parse_options "$@"
+    if [[ -z "$PLAYER" ]];
+    then
+      no_player_error_msg
+      exit -1;
+    fi;
+    #if [[ -z "$TIMER" ]];
+    #then
+    #  if [ ! -t 0 ] && [ ! -t 1 ]; then
+    #
+    #  fi
+    #fi
+  fi;
+}
 
 function breathe() {
   BREATHE="$1";
@@ -234,16 +228,20 @@ function meditate() {
   done;
 }
 
-meditate
+FPATH=.
+INHALE="$FPATH"/Inhale.mp3
+HOLD="$FPATH"/Hold.mp3
+EXHALE="$FPATH"/Exhale.mp3
 
-#while sleep $EXHALEHOLDTIME;
-#do
-#  count=$((count+1));
-#  $PLAYER $INHALE >&- 2>&-;
-#  sleep $INHALETIME;
-#  $PLAYER $HOLD >&- 2>&-;
-#  sleep $INHALEHOLDTIME;
-#  $PLAYER $EXHALE >&- 2>&-;
-#  sleep $EXHALETIME;
-#  $PLAYER $HOLD >&- 2>&-;
-#done
+INHALETIME=6
+INHALEHOLDTIME=4
+EXHALETIME=7
+EXHALEHOLDTIME=3
+PATTERNNAME="custom"
+PATTERN="$INHALETIME $INHALEHOLDTIME $EXHALETIME $EXHALEHOLDTIME"
+
+DEFAULTDB="meditate.db"
+
+options_or_no_options "$@"
+check_on_db
+meditate
