@@ -31,6 +31,7 @@ bold_text() { tput bold; echo -n "$1"; tput sgr0; }
 dbfile_not_found_error_msg() { echo "DB file $(bold_text $1) not found."; }
 dbfile_not_found_optiond_error_msg() { echo "$(dbfile_not_found_error_msg $1). Default file $(bold_text $DEFAULTDB) will be used."; }
 schema_diff_error_msg() { echo "The $1 file has a different schema. If it's the default db, then it will be renamed and a new file will be created."; }
+schema_cannot_check_msg() { echo "Not checking schema, as sqldiff is not available on Termux"; }
 db_update_success_msg="DB updated."
 
 setup_db() {
@@ -67,7 +68,12 @@ update_db() {
 
 check_db_schema() {
 #  echo "Checking DB Schema"
-  testdb="/tmp/test.db"
+  if [[ -n "$TERMUX" ]];
+  then
+    schema_cannot_check_msg
+    return
+  fi
+  testdb="schematest.db"
   setup_db "$testdb"
   diff=$(sqldiff -schema "$1" "$testdb")
   rm "$testdb"
@@ -108,6 +114,10 @@ while getopts ":hp:t:d:s:" opt; do
             ;;
           ffplay)
             PLAYER="ffplay -nodisp -autoexit"
+            ;;
+          termux)
+            PLAYER="termux-media-player play"
+            TERMUX=1
             ;;
           *)
           echo "$illegal_option_error_msg"
