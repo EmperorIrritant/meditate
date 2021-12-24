@@ -3,23 +3,69 @@
 trap display_time INT
 
 function display_time() {
-  diff=$SECONDS
+  ENDTIME=$(date +%s)
+  diff=$((ENDTIME-STARTTIME))
   tput cub 2 #To clear the "^C" characters printed on pressing Ctrl+C
-  echo "Full breath cycles: $count"
+  echo "Full breath cycles: $COUNT"
   echo "Meditation Time: $(($diff / 3600)) hours, $((($diff / 60) % 60)) minutes and $(($diff % 60)) seconds"
-  exit
+  update_db; #"$STARTTIME" "$ENDTIME" "$PATTERNNAME" "$PATTERN"
+  exit 0
 }
+
+DEFAULT_DB="meditate.db"
 
 usage="Usage: ./$(basename $0) [OPTIONS]
 
 Options:
- -p <player>      vlc, mpv, ffplay
- -t <seconds>     set meditation timer (default: infinite) (NOT IMPLEMENTED YET)
- -h               this help"
+ -p <player>            vlc, mpv, ffplay
+ -t <seconds>           set meditation timer (default: infinite) (NOT IMPLEMENTED YET)
+ -d <file>              sqlite db file (default: "$DEFAULT_DB" in the same directory)
+ -h                     this help"
 
-error_msg="Illegal usage. Try $(basename $0) -h for usage."
+illegal_option_error_msg="Illegal usage. Try $(basename $0) -h for usage."
+no_player_error_msg="No Player selected. "$illegal_option_error_msg""
+bold_text() { tput bold; echo -n "$1"; tput sgr0; }
+file_not_found_error_msg() { echo "DB file $(bold_text $1) not found. Default file $(bold_text $DEFAULT_DB) will be used."; }
+schema_diff_error_msg() { echo "The $1 file has a different schema. If it's the default db, then it will be renamed and a new file will be created."; }
+db_update_success_msg="DB updated."
 
-while getopts ":hp:t:" opt; do
+setup_db() {
+  createdbstmt='CREATE TABLE IF NOT EXISTS "meditated" (
+	  "session"	INTEGER PRIMARY KEY AUTOINCREMENT,
+	  "starttime"	REAL NOT NULL,
+	  "endtime"	REAL NOT NULL,
+	  "fullbreathcycles"	INTEGER NOT NULL,
+	  "patternname"	TEXT,
+	  "pattern"	TEXT NOT NULL
+    )';
+  sqlite3 "$1" "$createdbstmt";
+}
+
+update_db() {
+  insertstmt='INSERT INTO "meditated" ("starttime", "endtime", "fullbreathcycles", "patternname", "pattern")
+    VALUES ('"$STARTTIME"','"$ENDTIME"','"$COUNT"',"'"$PATTERNNAME"'","'"$PATTERN"'");'
+  #echo "Updating DB: $insertstmt";
+  response=$(sqlite3 "$DBFILE" "$insertstmt" 2>&1);
+  if [[ $response -eq 0 ]]; 
+  then
+    echo "$db_update_success_msg";
+  else
+    echo "Error: $response";
+  fi
+}
+
+check_db_schema() {
+  testdb="/tmp/test.db"
+  setup_db "$testdb"
+  diff=$(sqldiff -schema "$1" "$testdb")
+  rm "$testdb"
+  if [[ $diff -ne 0 ]];
+  then
+    schema_diff_error_msg "$1"
+  fi
+}
+
+while getopts ":hp:t:d:" opt; do
   case "${opt}" in
     h)
       echo "$usage"
@@ -43,7 +89,7 @@ while getopts ":hp:t:" opt; do
             PLAYER="ffplay -nodisp -autoexit"
             ;;
           *)
-          echo "$error_msg"
+          echo "$illegal_option_error_msg"
           exit 0
         esac
       fi
@@ -52,8 +98,27 @@ while getopts ":hp:t:" opt; do
       # Not implemented yet
       TIMER="$OPTARG"
       ;;
+    d)
+      DBFILE="${OPTARG}"
+      if [[ ! -f "$DBFILE" ]];
+      then
+        file_not_found_error_msg "$DBFILE"
+        if [[ ! -f "$DEFAULT_DB" ]];
+        then
+          setup_db "$DEFAULT_DB"
+          file="$DEFAULT_DB"
+        else
+          check_db_schema "$DEFAULT_DB"
+          mv "$DEFAULT_DB" "$DEFAULT_DB.badschema"
+          setup_db "$DEFAULT_DB"
+        fi
+      else
+        check_db_schema "$DBFILE"
+        exit -1;
+      fi
+      ;;
     ?)
-      echo "$error_msg"
+      echo "$illegal_option_error_msg"
       exit 0
       ;;
   esac
@@ -76,23 +141,58 @@ INHALETIME=6
 INHALEHOLDTIME=4
 EXHALETIME=7
 EXHALEHOLDTIME=3
+PATTERNNAME="custom"
+PATTERN="$INHALETIME $INHALEHOLDTIME $EXHALETIME $EXHALEHOLDTIME"
 
 if [[ -z "$PLAYER" ]];
 then
-  echo "No Player chosen. Exiting."
+  echo "$no_player_error_msg";
   exit -1;
 fi;
 
-count=0
-SECONDS=0
-while sleep $EXHALEHOLDTIME;
-do
-  count=$((count+1));
-  $PLAYER $INHALE >&- 2>&-;
-  sleep $INHALETIME;
+if [[ -z "$DBFILE" ]];
+then
+  setup_db "$DEFAULT_DB";
+  DBFILE="$DEFAULT_DB";
+fi
+
+function breathe() {
+  BREATHE="$1";
+  BREATHETIME="$2";
+  $PLAYER $BREATHE >&- 2>&-;
+  sleep "$BREATHETIME";
+}
+
+function hold() {
+  HOLD="$1"
+  HOLDTIME="$2"
   $PLAYER $HOLD >&- 2>&-;
-  sleep $INHALEHOLDTIME;
-  $PLAYER $EXHALE >&- 2>&-;
-  sleep $EXHALETIME;
-  $PLAYER $HOLD >&- 2>&-;
-done
+  sleep "$HOLDTIME";
+}
+
+function meditate() {
+  COUNT=0;
+  STARTTIME=$(date +%s);
+  while true;
+  do
+    breathe $INHALE $INHALETIME;
+    hold $HOLD $INHALEHOLDTIME;
+    breathe $EXHALE $EXHALETIME;
+    hold $HOLD $EXHALEHOLDTIME;
+    COUNT=$((COUNT+1))
+  done;
+}
+
+meditate
+
+#while sleep $EXHALEHOLDTIME;
+#do
+#  count=$((count+1));
+#  $PLAYER $INHALE >&- 2>&-;
+#  sleep $INHALETIME;
+#  $PLAYER $HOLD >&- 2>&-;
+#  sleep $INHALEHOLDTIME;
+#  $PLAYER $EXHALE >&- 2>&-;
+#  sleep $EXHALETIME;
+#  $PLAYER $HOLD >&- 2>&-;
+#done
