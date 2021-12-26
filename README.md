@@ -9,11 +9,11 @@ Finding minor inconveniences with existing meditation apps, I decided to make my
 Usage: ./meditate [OPTIONS]
 
 Options:
+ -h                     this help
  -p <player>            vlc, mpv, ffplay, termux
  -t <seconds>           set meditation timer (default: infinite) (NOT IMPLEMENTED YET)
  -d <file>              sqlite db file (default:  in the same directory)
  -s [file]              show session details in the database
- -h                     this help
 ```
 
 # Setup

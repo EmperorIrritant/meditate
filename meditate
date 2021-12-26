@@ -17,11 +17,11 @@ function display_time() {
 usage="Usage: ./$(basename $0) [OPTIONS]
 
 Options:
+ -h                     this help
  -p <player>            vlc, mpv, ffplay, termux
  -t <seconds>           set meditation timer (default: infinite) (NOT IMPLEMENTED YET)
  -d <file>              sqlite db file (default: "$DEFAULTDB" in the same directory)
- -s [file]              show session details in the database
- -h                     this help"
+ -s [file]              show session details in the database"
 
 illegal_option_error_msg() { echo "Illegal usage. Try $(basename $0) -h for usage."; }
 no_player_error_msg() { echo "No Player selected. $(illegal_option_error_msg)"; }
