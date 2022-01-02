@@ -23,7 +23,8 @@ Options:
  -c <pattern>           breath pattern as a in-hold-out-hold sequence (e.g. 7070, 4444, 4662, 10_5_10_5)
                         or as a in-out sequence (e.g. 77, 44, 46, 10_5)
  -d <file>              sqlite db file (default: "$DEFAULTDB" in the same directory)
- -s [file]              show session details in the database"
+ -s [file]              show session details in the database
+ -e <outputfile>        export database as sql or csv, based on extension"
 
 illegal_option_error_msg() { echo "Illegal usage. Try $(basename $0) -h for usage."; }
 no_player_error_msg() { echo "No Player selected. $(illegal_option_error_msg)"; }
@@ -34,6 +35,7 @@ schema_diff_error_msg() { echo "The $1 file has a different schema. If it's the 
 schema_cannot_check_msg() { echo "Not checking schema, as sqldiff is not available on Termux"; }
 db_update_success_msg() { echo "DB updated."; }
 invalid_sequence_error_msg() { echo "Invalid sequence pattern. Try with 46 or 4444 or 10_5, or see help for usage."; }
+invalid_output_filename_error_msg() { echo "Invalid output file to export. Mention a proper filename with either csv or sql extension."; }
 
 setup_db() {
   CREATETABLESTMT='CREATE TABLE IF NOT EXISTS "meditated" (
@@ -63,6 +65,24 @@ update_db() {
     db_update_success_msg;
   else
     echo "Error: $response";
+  fi
+}
+
+export_db() {
+  FILENAME="$1"
+  if [[ -n "$DBFILE" ]];
+  then
+    if [[ "$FILENAME" == *".sql" ]];
+    then
+      sqlite3 "$DBFILE" ".dump" > "$FILENAME"
+    elif [[ "$FILENAME" == *".csv" ]];
+    then
+       sqlite3 -header -csv "$DBFILE" 'select * from meditated;'
+    else
+      invalid_output_filename_error_msg
+    fi
+  else
+    dbfile_not_found_error_msg "<unknown>"
   fi
 }
 
@@ -96,7 +116,7 @@ EXHALETIME=7
 EXHALEHOLDTIME=3
 
 function parse_options() {
-  while getopts ":hp:t:d:s:c:" opt; do
+  while getopts ":hp:t:d:s:c:e:" opt; do
     case "${opt}" in
       h)
         echo "$usage"
@@ -205,6 +225,11 @@ function parse_options() {
           invalid_sequence_error_msg
           exit -1
         fi
+        ;;
+      e)
+        FILENAME="$OPTARG"
+        export_db "$FILENAME"
+        exit 0
         ;;
       :)
         if [[ "$OPTARG" == "s" ]];
