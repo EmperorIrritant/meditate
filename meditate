@@ -20,6 +20,8 @@ Options:
  -h                     this help
  -p <player>            vlc, mpv, ffplay, termux
  -t <seconds>           set meditation timer (default: infinite) (NOT IMPLEMENTED YET)
+ -c <pattern>           breath pattern as a in-hold-out-hold sequence (e.g. 7070, 4444, 4662, 10_5_10_5)
+                        or as a in-out sequence (e.g. 77, 44, 46, 10_5)
  -d <file>              sqlite db file (default: "$DEFAULTDB" in the same directory)
  -s [file]              show session details in the database"
 
@@ -31,6 +33,7 @@ dbfile_not_found_optiond_error_msg() { echo "$(dbfile_not_found_error_msg $1). D
 schema_diff_error_msg() { echo "The $1 file has a different schema. If it's the default db, then it will be renamed and a new file will be created."; }
 schema_cannot_check_msg() { echo "Not checking schema, as sqldiff is not available on Termux"; }
 db_update_success_msg() { echo "DB updated."; }
+invalid_sequence_error_msg() { echo "Invalid sequence pattern. Try with 46 or 4444 or 10_5, or see help for usage."; }
 
 setup_db() {
   CREATETABLESTMT='CREATE TABLE IF NOT EXISTS "meditated" (
@@ -78,6 +81,7 @@ check_db_schema() {
     schema_diff_error_msg "$1"
     return -1
   fi
+  return 0
 }
 
 display_db() {
@@ -86,8 +90,13 @@ display_db() {
   sqlite3 -header -column "$DBFILE" "$QUERYSTMT";
 }
 
+INHALETIME=6
+INHALEHOLDTIME=4
+EXHALETIME=7
+EXHALEHOLDTIME=3
+
 function parse_options() {
-  while getopts ":hp:t:d:s:" opt; do
+  while getopts ":hp:t:d:s:c:" opt; do
     case "${opt}" in
       h)
         echo "$usage"
@@ -116,7 +125,7 @@ function parse_options() {
               ;;
             *)
               illegal_option_error_msg
-              exit 0
+              exit -1
           esac
         fi
         ;;
@@ -150,20 +159,61 @@ function parse_options() {
           display_db "$DBFILE"
         else
           dbfile_not_found_error_msg "$OPTARG"
+          exit -1
         fi
         exit 0;
+        ;;
+      c)
+        if [[ "$OPTARG" == *"_"* ]];
+        then
+          SEQ=(${OPTARG//_/ })
+          if [[ "${#SEQ[@]}" -eq 4 ]];
+          then
+            INHALETIME="${SEQ[0]}"
+            INHALEHOLDTIME="${SEQ[1]}"
+            EXHALETIME="${SEQ[2]}"
+            EXHALEHOLDTIME="${SEQ[3]}"
+          elif [[ "${#SEQ[@]}" -eq 2 ]];
+          then
+            INHALETIME="${SEQ[0]}"
+            INHALEHOLDTIME=0
+            EXHALETIME="${SEQ[1]}"
+            EXHALEHOLDTIME=0
+          else
+            invalid_sequence_error_msg
+            exit -1
+          fi
+        elif [[ ${#OPTARG} -eq 4 ]];
+        then
+          INHALETIME="${OPTARG:0:1}"
+          INHALEHOLDTIME="${OPTARG:1:1}"
+          EXHALETIME="${OPTARG:2:1}"
+          EXHALEHOLDTIME="${OPTARG:3:1}"
+        elif [[ "${#OPTARG}" -eq 2 ]];
+        then
+          INHALETIME="${OPTARG:0:1}"
+          INHALEHOLDTIME=0
+          EXHALETIME="${OPTARG:1:1}"
+          EXHALEHOLDTIME=0
+        else
+          invalid_sequence_error_msg
+          exit -1
+        fi
         ;;
       :)
         if [[ "$OPTARG" == "s" ]];
         then
           DBFILE="$DEFAULTDB"
           display_db "$DBFILE"
+        elif [[ "$OPTARG" == "c" ]];
+        then
+          list_preset_patterns
         fi
         exit 0;
         ;;
       ?)
         illegal_option_error_msg
-        exit 0
+        exit -1
         ;;
     esac
   done
@@ -228,20 +278,17 @@ function meditate() {
   done;
 }
 
+DEFAULTDB="meditate.db"
+
+options_or_no_options "$@"
+
 FPATH=.
 INHALE="$FPATH"/Inhale.mp3
 HOLD="$FPATH"/Hold.mp3
 EXHALE="$FPATH"/Exhale.mp3
 
-INHALETIME=6
-INHALEHOLDTIME=4
-EXHALETIME=7
-EXHALEHOLDTIME=3
 PATTERNNAME="custom"
 PATTERN="$INHALETIME $INHALEHOLDTIME $EXHALETIME $EXHALEHOLDTIME"
 
-DEFAULTDB="meditate.db"
-
-options_or_no_options "$@"
 check_on_db
 meditate
