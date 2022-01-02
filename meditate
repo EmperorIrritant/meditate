@@ -85,7 +85,7 @@ check_db_schema() {
 }
 
 display_db() {
-  QUERYSTMT="SELECT Session, StartTime, Duration, BreathCycles, PatternName, Pattern from meditated;"
+  QUERYSTMT="SELECT Session, StartTime, Duration, BreathCycles, Pattern from meditated;"
   DBFILE="$1";
   sqlite3 -header -column "$DBFILE" "$QUERYSTMT";
 }
@@ -205,9 +205,6 @@ function parse_options() {
         then
           DBFILE="$DEFAULTDB"
           display_db "$DBFILE"
-        elif [[ "$OPTARG" == "c" ]];
-        then
-          list_preset_patterns
         fi
         exit 0;
         ;;
