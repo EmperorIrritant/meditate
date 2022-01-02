@@ -199,6 +199,12 @@ function parse_options() {
           invalid_sequence_error_msg
           exit -1
         fi
+
+        if [[ "$INHALETIME" -eq 0 || "$EXHALETIME" -eq 0 ]];
+        then
+          invalid_sequence_error_msg
+          exit -1
+        fi
         ;;
       :)
         if [[ "$OPTARG" == "s" ]];
@@ -258,8 +264,11 @@ function breathe() {
 function hold() {
   HOLD="$1"
   HOLDTIME="$2"
-  $PLAYER $HOLD >&- 2>&-;
-  sleep "$HOLDTIME";
+  if [[ "$HOLDTIME" -ge 1 ]];
+  then
+    $PLAYER $HOLD >&- 2>&-;
+    sleep "$HOLDTIME";
+  fi
 }
 
 function meditate() {
