@@ -11,9 +11,18 @@ Usage: ./meditate [OPTIONS]
 Options:
  -h                     this help
  -p <player>            vlc, mpv, ffplay, termux
- -t <seconds>           set meditation timer (default: infinite) (NOT IMPLEMENTED YET)
- -d <file>              sqlite db file (default:  in the same directory)
+ -t <seconds>           set meditation timer (default: infinite)
+                        (NOT IMPLEMENTED YET)
+ -c <pattern>           breath pattern as a in-hold-out-hold sequence
+                        (e.g. 7070, 4444, 4662, 10_5_10_5) or as an
+                        in-out sequence (e.g. 77, 44, 46, 10_5)
+ -d <file>              sqlite db file (default:  in the
+                        same directory)
  -s [file]              show session details in the database
+ -i <importfile>        export sql or csv into database (merging of databases
+                        not supported; imported database replaces existing,
+                        if any, but backup of existing db is made)
+ -e <outputfile>        export database as sql or csv, based on extension
 ```
 
 # Setup
